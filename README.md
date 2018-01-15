@@ -6,11 +6,11 @@ This is just a quickstart for using terraform on Demo. It creates:
 |----|----------|
 1 | Router
 2 | Subnets, web and db
-4 | instances, 2 web, 2 db
-2 | floating IPs for web cluster
-2 | Server Groups with **`anti-affiniy`** (web, db) makes sure instances aren't on same physical hardware
-3 | Security Groups "demo-ssh-sg", "demo-web-sg" and "demo-db-sg"
-1 | Key pair "demo\_rsa"
+3 | instances, 2 web, 2 db
+4 | floating IPs for web cluster
+5 | Server Groups with **`anti-affiniy`** (web, db) makes sure instances aren't on same physical hardware
+6 | Security Groups "demo-ssh-sg", "demo-web-sg" and "demo-db-sg"
+7 | Key pair "demo\_rsa"
 
 
 ## File structure
