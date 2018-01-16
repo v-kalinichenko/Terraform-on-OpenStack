@@ -1,31 +1,4 @@
-# These variables are received through variables created 
-# by terraform-openrc.sh, hence, run that first
-
-variable "password" {}
-variable "user_name" {}
-variable "tenant_name" {}
-
-variable "ssh_user_name" {
-  default = "centos"
-}
-
-variable "count_instance" {
-  default = 2
-}
-
-variable "img_name" {
-  default = "CentOS-7-GenericCloud"
-}
-
-variable "flavor_name" {
-  default = "m1.my"
-}
-
-variable "police_name" {
-  default = "affinity"
-}
-
-### [Openstack] ###
+### [Openstack Demo] ###
 
 provider "openstack" {
   user_name = "${var.user_name}"
@@ -45,9 +18,6 @@ resource "openstack_compute_keypair_v2" "demo_keypair" {
   region = ""
   public_key = "${file("cloud.key.pub")}"
 }
-
-### Should be tighten up, not let the world be able to ssh
-### this is only for demonstrational purposes.
 
 resource "openstack_compute_secgroup_v2" "ssh_sg" {
   name = "demo-ssh-sg"
@@ -156,6 +126,7 @@ resource "openstack_compute_instance_v2" "web_cluster" {
       "sudo yum install epel-release -y",
       "sudo yum install nginx -y",
       "sudo service nginx start",
+      "sudo systemctl enable nginx",
 ]
     connection {
       type     = "ssh"
@@ -175,9 +146,14 @@ resource "openstack_compute_floatingip_associate_v2" "fip_assoc" {
   instance_id = "${element(openstack_compute_instance_v2.web_cluster.*.id, count.index)}"
 }
 
-output "web-instances" {
+output "external_web_instances" {
   value = "${join(",", openstack_compute_floatingip_associate_v2.fip_assoc.*.floating_ip)}"
 }
+output "internal_web_instances" {
+  value = "${join( "," , openstack_compute_instance_v2.web_cluster.*.access_ip_v4) }"
+}
+
+
 
 ### [DB networking] ###
 
@@ -223,6 +199,69 @@ resource "openstack_compute_instance_v2" "db_cluster" {
   user_data = "${var.ssh_user_name}"
 }
 
-output "db-instances" {
+output "internal_db_instances" {
   value = "${join( "," , openstack_compute_instance_v2.db_cluster.*.access_ip_v4) }"
+}
+
+
+### [Web LB] ###
+
+resource "openstack_lb_loadbalancer_v2" "lb_1" {
+	name = "demo_lb_1"
+        vip_subnet_id = "${openstack_networking_subnet_v2.web_subnet.id}"
+        vip_address = "10.0.0.100"
+#       security_group_ids = "${openstack_compute_secgroup_v2.web_sg.id}"
+        admin_state_up = "true"
+}
+
+resource "openstack_lb_monitor_v2" "monitor_1" {
+  pool_id     = "${openstack_lb_pool_v2.pool_1.id}"
+  type        = "PING"
+  delay       = 20
+  timeout     = 10
+  max_retries = 5
+  admin_state_up = "true"
+}
+
+resource "openstack_lb_member_v2" "members_1" {
+  count = "${var.count_instance}"
+  pool_id = "${openstack_lb_pool_v2.pool_1.id}"
+  subnet_id = "${openstack_networking_subnet_v2.web_subnet.id}"
+  address = "${element(openstack_compute_instance_v2.web_cluster.*.access_ip_v4, count.index)}"
+  protocol_port = 80
+  admin_state_up = "true"
+}
+
+resource "openstack_lb_listener_v2" "listener_1" {
+  name = "demo_listener_1"
+  protocol        = "HTTP"
+  protocol_port   = 80
+  loadbalancer_id = "${openstack_lb_loadbalancer_v2.lb_1.id}"
+
+  depends_on = [
+        "openstack_lb_loadbalancer_v2.lb_1",
+    ]
+  admin_state_up = "true"
+}
+
+resource "openstack_lb_pool_v2" "pool_1" {
+  name        = "demo_pool_1"
+  protocol    = "HTTP"
+  lb_method   = "ROUND_ROBIN"
+  listener_id = "${openstack_lb_listener_v2.listener_1.id}"
+  persistence {
+  type        = "SOURCE_IP"
+ }
+  admin_state_up = "true"
+}
+
+resource "openstack_networking_floatingip_v2" "lb_fip" {
+  region = ""
+  pool   = "public"
+  port_id = "${openstack_lb_loadbalancer_v2.lb_1.vip_port_id}"
+}
+
+
+output "loadbalanser_external_address" {
+  value = "${join(",", openstack_networking_floatingip_v2.lb_fip.*.address)}"
 }
