@@ -11,6 +11,7 @@ This is just a quickstart for using terraform on Demo. It creates:
 5 | Server Groups with **`anti-affiniy`** (web, db) makes sure instances aren't on same physical hardware
 6 | Security Groups "demo-ssh-sg", "demo-web-sg" and "demo-db-sg"
 7 | Key pair "demo\_rsa"
+8 | loadbalancer lb_1, pool, monitor, listnet, member.....
 
 
 ## File structure
@@ -21,6 +22,7 @@ cloud.key(\|\\.pub) | SSH keypair, only to be used for this demonstration
 demo1.tf | The terraform manifest with all defined resources
 terraform-openrc.sh | should be run initially to setup username, tenant and password
 terraform.tfstate(\|\\.backup) | tfstate and tfstate.backup so that terraform can keep track on changes
+variables.tf | Variables
 
 
 ## How to use
